@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Live</title>
+<style>
+  :root{
+    --bg:#000;
+    --paper:#fff;
+    --dim:rgba(255,255,255,0.75);
+    --pillbg:rgba(38,38,38,0.55);
+    --heart:#ff375f;
+    --grad1:#f9ce34; --grad2:#ee2a7b; --grad3:#6228d7;
+    --display: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{ margin:0; padding:0; height:100%; background:#000; overflow:hidden; font-family:var(--display); -webkit-user-select:none; user-select:none;}
+  #stage{ position:relative; width:100vw; height:100vh; height:100dvh; background:#000; overflow:hidden; }
+  #cam{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#0a0a0a; }
+  #camPlaceholder{
+    position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; color:var(--dim); text-align:center; padding:40px;
+  }
+  #camPlaceholder button{
+    background:linear-gradient(90deg, var(--grad1), var(--grad2), var(--grad3));
+    border:none; color:#fff; font-weight:700; padding:12px 26px; border-radius:22px; font-size:14px;
+  }
+  #demoNotice{
+    position:absolute; z-index:30; top:6px; left:50%; transform:translateX(-50%);
+    font-size:9.5px; letter-spacing:0.06em; color:rgba(255,255,255,0.4); pointer-events:none;
+  }
+
+  /* top bar */
+  #topbar{
+    position:absolute; top:0; left:0; right:0; z-index:20;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: max(16px, env(safe-area-inset-top)) 12px 30px 12px;
+    background:linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 100%);
+  }
+  #userChip{ display:flex; align-items:center; gap:8px; }
+  #avatarRing{
+    width:34px; height:34px; border-radius:50%; padding:2px;
+    background:linear-gradient(135deg, var(--grad1), var(--grad2), var(--grad3));
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  #avatarInner{
+    width:100%; height:100%; border-radius:50%; background:#222 center/cover no-repeat;
+    border:2px solid #000;
+    display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:700;
+  }
+  #nameLive{ display:flex; flex-direction:column; }
+  #uname{ color:#fff; font-size:13.5px; font-weight:600; line-height:1.15; }
+  #livepillRow{ display:flex; align-items:center; gap:6px; margin-top:2px; }
+  #livepill{
+    background:var(--heart); color:#fff; font-size:10.5px; font-weight:700;
+    letter-spacing:0.03em; padding:1.5px 7px; border-radius:3px;
+  }
+  #eyeCount{ display:flex; align-items:center; gap:3px; color:#fff; font-size:12px; font-weight:600; }
+  #eyeCount svg{ width:13px; height:13px; }
+
+  #closeX{
+    width:30px; height:30px; border-radius:50%; background:rgba(38,38,38,0.5);
+    display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px; flex-shrink:0;
+  }
+
+  /* comments */
+  #feed{
+    position:absolute; left:0; bottom:0; z-index:15;
+    width:min(76vw, 320px);
+    padding: 14px 8px 96px 12px;
+    display:flex; flex-direction:column; justify-content:flex-end; gap:6px;
+    max-height:46vh; overflow:hidden;
+    -webkit-mask-image: linear-gradient(to top, black 55%, transparent 100%);
+    mask-image: linear-gradient(to top, black 55%, transparent 100%);
+  }
+  .comment{
+    display:inline-flex; gap:6px; align-items:baseline; width:fit-content; max-width:100%;
+    background:var(--pillbg); backdrop-filter:blur(2px);
+    padding:5px 10px; border-radius:14px; font-size:13px; line-height:1.3; color:#fff;
+    animation: rise 0.3s ease-out;
+  }
+  @keyframes rise{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+  .comment .u{ font-weight:700; flex-shrink:0; }
+  .comment .t{ opacity:0.95; word-break:break-word; }
+
+  /* hearts */
+  #heartLayer{ position:absolute; inset:0; z-index:16; pointer-events:none; overflow:hidden; }
+  .heart{
+    position:absolute; bottom:78px; right:18px; font-size:22px; color:var(--heart);
+    animation: floatUp 3.2s ease-in forwards;
+  }
+  @keyframes floatUp{
+    0%{ transform:translateX(0) translateY(0) scale(0.7) rotate(0deg); opacity:0; }
+    10%{ opacity:1; }
+    100%{ transform:translateX(var(--drift,0px)) translateY(-420px) scale(1.05) rotate(var(--rot,10deg)); opacity:0; }
+  }
+
+  /* bottom bar */
+  #bottombar{
+    position:absolute; left:0; right:0; bottom:0; z-index:20;
+    padding: 10px 10px max(12px, env(safe-area-inset-bottom)) 10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  #chatInput{
+    flex:1; background:rgba(38,38,38,0.55); backdrop-filter:blur(4px);
+    border:1px solid rgba(255,255,255,0.18);
+    color:#fff; border-radius:20px; padding:9px 15px; font-size:14px; font-family:var(--display);
+  }
+  #chatInput::placeholder{ color:rgba(255,255,255,0.6); }
+  .iconBtn{
+    width:36px; height:36px; border-radius:50%; border:none;
+    background:rgba(38,38,38,0.55); display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:18px; flex-shrink:0;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <video id="cam" autoplay playsinline muted></video>
+  <div id="camPlaceholder">
+    <div style="font-size:12px; letter-spacing:0.04em;">CAMERA — STANDBY</div>
+    <button id="startCamBtn">Start live video</button>
+    <div style="font-size:10.5px; max-width:260px; opacity:0.75;">Uses your device camera locally. This is a styled mockup — it isn't Instagram and nothing is broadcast anywhere.</div>
+  </div>
+  <div id="demoNotice">STYLED MOCKUP · NOT AFFILIATED WITH INSTAGRAM</div>
+
+  <div id="topbar">
+    <div id="userChip">
+      <div id="avatarRing"><div id="avatarInner">you</div></div>
+      <div id="nameLive">
+        <div id="uname">your_username</div>
+        <div id="livepillRow">
+          <span id="livepill">Live</span>
+          <span id="eyeCount">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="#fff" stroke-width="2"/></svg>
+            <span id="viewerCount">0</span>
+          </span>
+        </div>
+      </div>
+    </div>
+    <div id="closeX">✕</div>
+  </div>
+
+  <div id="heartLayer"></div>
+  <div id="feed"></div>
+
+  <div id="bottombar">
+    <input id="chatInput" type="text" placeholder="Comment..." readonly>
+    <button class="iconBtn" id="heartBtn">🤍</button>
+    <button class="iconBtn" id="shareBtn">↗</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const camEl = document.getElementById('cam');
+  const placeholder = document.getElementById('camPlaceholder');
+  const startBtn = document.getElementById('startCamBtn');
+
+  startBtn.addEventListener('click', async () => {
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user' }, audio:false });
+      camEl.srcObject = stream;
+      placeholder.style.display = 'none';
+      begin();
+    }catch(e){
+      placeholder.querySelector('div').textContent = 'Camera unavailable — showing overlay only';
+      begin();
+    }
+  });
+
+  // viewer count
+  let viewers = 634;
+  const viewerEl = document.getElementById('viewerCount');
+  function fmt(n){ return n >= 1000 ? (n/1000).toFixed(1)+'K' : n.toString(); }
+  function tickViewers(){
+    viewers = Math.max(300, viewers + Math.floor(Math.random()*12) - 3);
+    viewerEl.textContent = fmt(viewers);
+  }
+
+  // comments
+  const names = ['jenna.k','mrto_biker','sxdstudios','wave.lee','omar__v','kittyk0de','nour.el','devon_p','ariaflux','luca.codes','pip.squeaks','harlow_m','zed.walks','tobin__','mira.sunn'];
+  const lines = ['omg hiii 😭','how long u been live','wait this is so good','the lighting!! 🔥','can u say hi to me','been here since the start','LMAOO stop','this is everything','okay but why is this so entertaining','running to tell my friends','the vibe rn ✨','no bc same','first time catching this live'];
+  const feed = document.getElementById('feed');
+  function pushComment(){
+    const div = document.createElement('div');
+    div.className = 'comment';
+    const name = names[Math.floor(Math.random()*names.length)];
+    const line = lines[Math.floor(Math.random()*lines.length)];
+    div.innerHTML = `<span class="u">${name}</span><span class="t">${line}</span>`;
+    feed.appendChild(div);
+    while(feed.children.length > 8) feed.removeChild(feed.firstChild);
+  }
+
+  // hearts
+  const heartLayer = document.getElementById('heartLayer');
+  function launchHeart(){
+    const el = document.createElement('div');
+    el.className = 'heart';
+    el.textContent = '❤️';
+    el.style.setProperty('--drift', (Math.random()*80-70)+'px');
+    el.style.setProperty('--rot', (Math.random()*30-15)+'deg');
+    heartLayer.appendChild(el);
+    setTimeout(()=> el.remove(), 3300);
+  }
+
+  document.getElementById('heartBtn').addEventListener('click', () => { launchHeart(); viewers += 1; });
+
+  let started = false;
+  function begin(){
+    if(started) return; started = true;
+    setInterval(tickViewers, 1400);
+    setInterval(pushComment, 1200);
+    setInterval(()=> { if(Math.random() > 0.5) launchHeart(); }, 900);
+    for(let i=0;i<4;i++) setTimeout(pushComment, i*200);
+  }
+})();
+</script>
+</body>
+</html>
